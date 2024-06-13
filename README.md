@@ -11,5 +11,5 @@ To run the app, execute the following commands:
 python -m venv venv
 python -m pip install --upgrade pip
 pip install -r requirements.txt
-uvicorn main:app --reload
+uvicorn app.main:app --reload
 ```
