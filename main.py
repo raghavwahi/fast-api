@@ -1,11 +1,11 @@
 import uuid
-
-from fastapi import FastAPI, Response, status, HTTPException
-from fastapi.params import Body
-from pydantic import BaseModel
 from typing import Optional
 
+from fastapi import FastAPI, HTTPException, Response, status
+from pydantic import BaseModel
+
 app = FastAPI()
+
 
 class Post(BaseModel):
     title: str
@@ -16,13 +16,16 @@ class Post(BaseModel):
 
 posts = []
 
+
 @app.get("/")
 async def root():
     return {"message": "Hello world"}
 
+
 @app.get("/posts")
 def get_posts():
     return {"data": posts}
+
 
 @app.post("/posts", status_code=status.HTTP_201_CREATED)
 def create_posts(post: Post):
@@ -31,8 +34,9 @@ def create_posts(post: Post):
     posts.append(post_dict)
     return {"data": post_dict}
 
+
 @app.get("/posts/{id}")
-def get_post(id: str, response: Response):
+def get_post(id: str):
     print(id)
     for post in posts:
         if post["id"] == id:
@@ -41,4 +45,19 @@ def get_post(id: str, response: Response):
     # response.status_code = status.HTTP_404_NOT_FOUND
     # return {"message": f"post with id {id} not found"}
 
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"post with id {id} not found")
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND, detail=f"post with id {id} not found"
+    )
+
+
+@app.delete("/posts/{id}")
+def delete_post(id: str):
+    for index, post in enumerate(posts):
+        if post["id"] == id:
+            posts.pop(index)
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"post with id {id} does not exist",
+    )
