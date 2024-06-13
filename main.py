@@ -24,7 +24,7 @@ async def root():
 def get_posts():
     return {"data": posts}
 
-@app.post("/posts")
+@app.post("/posts", status_code=status.HTTP_201_CREATED)
 def create_posts(post: Post):
     post_dict = post.dict()
     post_dict["id"] = uuid.uuid4().hex
