@@ -1,7 +1,11 @@
 from typing import Optional
 
+import psycopg
 from fastapi import FastAPI, HTTPException, Response, status
+from psycopg.rows import dict_row
 from pydantic import BaseModel
+
+from app.util.config import settings
 
 app = FastAPI()
 
@@ -13,9 +17,6 @@ class Post(BaseModel):
     rating: Optional[int] = None
 
 
-posts = []
-
-
 @app.get("/")
 async def root():
     return {"message": "Hello world"}
@@ -23,6 +24,13 @@ async def root():
 
 @app.get("/posts")
 def get_posts():
+    conn = psycopg.connect(
+        f"dbname={settings.PG_DATABASE} user={settings.PG_USER} password={settings.PG_PASSWORD} host={settings.PG_HOST} port={settings.PG_PORT}",
+        row_factory=dict_row,
+    )
+    cur = conn.cursor()
+    cur.execute(f"SELECT * FROM {settings.PG_SCHEMA}.posts")
+    posts = cur.fetchall()
     return {"data": posts}
 
 
