@@ -25,7 +25,7 @@ class Post(BaseModel):
 
 @app.get("/")
 async def root():
-    return {"message": "Hello world"}
+    return {"message": "Hello world from Fast API"}
 
 
 @app.get("/posts")
