@@ -9,6 +9,12 @@ from app.util.config import settings
 
 app = FastAPI()
 
+conn = psycopg.connect(
+    f"dbname={settings.PG_DATABASE} user={settings.PG_USER} password={settings.PG_PASSWORD} host={settings.PG_HOST} port={settings.PG_PORT}",
+    row_factory=dict_row,
+)
+cur = conn.cursor()
+
 
 class Post(BaseModel):
     title: str
@@ -24,11 +30,6 @@ async def root():
 
 @app.get("/posts")
 def get_posts():
-    conn = psycopg.connect(
-        f"dbname={settings.PG_DATABASE} user={settings.PG_USER} password={settings.PG_PASSWORD} host={settings.PG_HOST} port={settings.PG_PORT}",
-        row_factory=dict_row,
-    )
-    cur = conn.cursor()
     cur.execute(f"SELECT * FROM {settings.PG_SCHEMA}.posts")
     posts = cur.fetchall()
     return {"data": posts}
@@ -36,20 +37,21 @@ def get_posts():
 
 @app.post("/posts", status_code=status.HTTP_201_CREATED)
 def create_posts(post: Post):
-    post_dict = post.dict()
-    post_dict["id"] = len(posts) + 1
-    posts.append(post_dict)
-    return {"data": post_dict}
+    cur.execute(
+        f"INSERT INTO {settings.PG_SCHEMA}.posts (title, content, published) VALUES (%s, %s, %s) RETURNING *",
+        (post.title, post.content, post.publish),
+    )
+    conn.commit()
+    new_post = cur.fetchone()
+    return {"data": new_post}
 
 
 @app.get("/posts/{id}")
-def get_post(id: int):
-    for post in posts:
-        if post["id"] == id:
-            return {"data": post}
-
-    # response.status_code = status.HTTP_404_NOT_FOUND
-    # return {"message": f"post with id {id} not found"}
+def get_post(id: str):
+    cur.execute(f"SELECT * FROM {settings.PG_SCHEMA}.posts WHERE id = %s", (id,))
+    post = cur.fetchone()
+    if post:
+        return {"data": post}
 
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND, detail=f"post with id {id} not found"
@@ -57,11 +59,14 @@ def get_post(id: int):
 
 
 @app.delete("/posts/{id}")
-def delete_post(id: int):
-    for index, post in enumerate(posts):
-        if post["id"] == id:
-            posts.pop(index)
-            return Response(status_code=status.HTTP_204_NO_CONTENT)
+def delete_post(id: str):
+    cur.execute(
+        f"DELETE FROM {settings.PG_SCHEMA}.posts WHERE id = %s RETURNING *", (id,)
+    )
+    conn.commit()
+    deleted_post = cur.fetchone()
+    if deleted_post:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
@@ -70,13 +75,15 @@ def delete_post(id: int):
 
 
 @app.put("/posts/{id}")
-def update_post(id: int, post: Post):
-    for index, post_data in enumerate(posts):
-        if post_data["id"] == id:
-            post_dict = post.dict()
-            post_dict["id"] = id
-            posts[index] = post_dict
-            return {"data": post_dict}
+def update_post(id: str, post: Post):
+    cur.execute(
+        f"UPDATE {settings.PG_SCHEMA}.posts SET title= %s, content = %s, published = %s WHERE id = %s RETURNING *",
+        (post.title, post.content, post.publish, id),
+    )
+    conn.commit()
+    updated_post = cur.fetchone()
+    if updated_post:
+        return {"data": updated_post}
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail=f"post with id {id} does not exist",
